@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="lfGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#020617" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2" result="blur" />
+      <feComposite in="SourceGraphic" in2="blur" operator="over" />
+    </filter>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#bgGrad)" />
+  <rect width="60" height="60" x="2" y="2" rx="14" fill="none" stroke="url(#lfGrad)" stroke-width="1.5" stroke-opacity="0.4" />
+  
+  <!-- Interconnected Link -->
+  <g filter="url(#glow)">
+    <path d="M26 34 L21 39 C17.134 42.866 17.134 49.134 21 53 C24.866 56.866 31.134 56.866 35 53 L40 48" fill="none" stroke="url(#lfGrad)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M38 30 L43 25 C46.866 21.134 46.866 14.866 43 11 C39.134 7.134 32.866 7.134 29 11 L24 16" fill="none" stroke="url(#lfGrad)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+    <line x1="26" y1="38" x2="38" y2="26" stroke="url(#lfGrad)" stroke-width="5" stroke-linecap="round" />
+    <circle cx="48" cy="16" r="3" fill="#10b981" />
+  </g>
+</svg>
