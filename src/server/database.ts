@@ -89,6 +89,7 @@ async function initSchema(cl: typeof client): Promise<void> {
       submission_attempted_at text,
       submission_result_url text,
       submission_reference text,
+      validation_error text,
       FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON UPDATE no action ON DELETE cascade
     );`,
     `CREATE UNIQUE INDEX IF NOT EXISTS prospects_campaign_domain_unique ON prospects (campaign_id, domain);`,
@@ -175,7 +176,8 @@ async function initSchema(cl: typeof client): Promise<void> {
   const columnsToAdd = [
     "ALTER TABLE prospects ADD COLUMN submission_attempted_at text",
     "ALTER TABLE prospects ADD COLUMN submission_result_url text",
-    "ALTER TABLE prospects ADD COLUMN submission_reference text"
+    "ALTER TABLE prospects ADD COLUMN submission_reference text",
+    "ALTER TABLE prospects ADD COLUMN validation_error text"
   ];
   for (const colSql of columnsToAdd) {
     try {
@@ -192,11 +194,9 @@ if (existsSync(migrationsFolder)) {
     await migrate(db, { migrationsFolder });
   } catch (error) {
     console.warn("[database] Drizzle migrate failed, applying embedded schema:", error);
-    await initSchema(client);
   }
-} else {
-  await initSchema(client);
 }
+await initSchema(client);
 
 if (isLocalDatabase) {
   const integrityResult = await client.execute("PRAGMA integrity_check");

@@ -112,19 +112,23 @@ export const importProspects = createServerFn({ method: "POST" })
     }
 
     const rows = data.rows.slice(0, 500).flatMap((row) => {
-      const domain = normalizeProspectDomain(row.domain);
-      return domain
-        ? [
-            {
-              campaign_id: data.campaignId,
-              domain,
-              contact_email: row.contact_email?.trim() || null,
-              da_dr_score: Number.isFinite(row.da_dr_score)
-                ? Math.max(0, Math.round(row.da_dr_score))
-                : 0,
-            },
-          ]
-        : [];
+      try {
+        const domain = normalizeProspectDomain(row.domain);
+        return domain
+          ? [
+              {
+                campaign_id: data.campaignId,
+                domain,
+                contact_email: row.contact_email?.trim() || null,
+                da_dr_score: Number.isFinite(row.da_dr_score)
+                  ? Math.max(0, Math.round(row.da_dr_score))
+                  : 0,
+              },
+            ]
+          : [];
+      } catch {
+        return [];
+      }
     });
     if (rows.length === 0) throw new Error("No valid rows found in the import");
 
@@ -136,7 +140,13 @@ export const importProspects = createServerFn({ method: "POST" })
         .where(eq(prospects.campaign_id, data.campaignId))
         .all();
       const existingDomains = new Set(
-        existing.map((prospect) => normalizeProspectDomain(prospect.domain)),
+        existing.map((prospect) => {
+          try {
+            return normalizeProspectDomain(prospect.domain);
+          } catch {
+            return prospect.domain;
+          }
+        }),
       );
       const rowsToInsert = uniqueRows.filter((row) => !existingDomains.has(row.domain));
       if (rowsToInsert.length === 0) return 0;

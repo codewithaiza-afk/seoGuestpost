@@ -126,6 +126,7 @@ export const prospects = sqliteTable(
     workflow_status: text("workflow_status").notNull().default("Discovered"),
     is_dofollow: integer("is_dofollow", { mode: "boolean" }).notNull().default(false),
     last_checked_at: text("last_checked_at"),
+    validation_error: text("validation_error"),
     created_at: text("created_at")
       .notNull()
       .default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),

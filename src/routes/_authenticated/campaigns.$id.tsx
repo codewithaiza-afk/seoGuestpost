@@ -77,6 +77,7 @@ import {
   type BusinessProfile,
 } from "@/lib/business-profile";
 import { normalizeSubmissionUrl } from "@/lib/submission-url";
+import { isPublicDomain } from "@/lib/domain-validator";
 import type { Json } from "../../../drizzle/schema";
 
 export const Route = createFileRoute("/_authenticated/campaigns/$id")({
@@ -149,6 +150,7 @@ type ProspectFull = {
   last_checked_at: string | null;
   created_at: string;
   campaign_id: string;
+  validation_error?: string | null;
 };
 
 type GeneratedArticle = {
@@ -404,6 +406,7 @@ function CampaignDetailPage() {
 
   // ── Deliverables Drawer / Sheet State ─────────────────────────────────────
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [errorsDrawerOpen, setErrorsDrawerOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selectedProspect = prospects.find((p) => p.id === selectedId) ?? null;
   const safeSubmissionUrl = selectedProspect
@@ -653,7 +656,9 @@ function CampaignDetailPage() {
 
   // ── 100% Fully Autonomous Pipeline Engine ────────────────────────────────
   const runAutoPilot = async (customProspects?: ProspectFull[]) => {
-    const listToProcess = (customProspects || prospects).filter((p) => p.status === "Discovered");
+    const listToProcess = (customProspects || prospects).filter(
+      (p) => p.status === "Discovered" && !p.validation_error && p.workflow_status !== "Failed",
+    );
 
     if (listToProcess.length === 0) {
       toast.info("No new prospects are waiting for outreach.");
@@ -717,45 +722,66 @@ function CampaignDetailPage() {
             },
           },
         });
-        completedCount += 1;
-        if (result.emailDispatch === "sent") emailsSentCount += 1;
-        if (result.emailDispatch === "duplicate") duplicateEmailsSkippedCount += 1;
-        if (result.emailDispatch === "missing-contact") missingContactCount += 1;
+        if (!result.ok || result.actionTaken === "failed") {
+          failedCount += 1;
+          result.logs.forEach((l) => addLog(`  ${l}`, p.domain));
+          setActiveCampaign((prev: any) => {
+            if (!prev?.prospects) return prev;
+            return {
+              ...prev,
+              prospects: prev.prospects.map((item: ProspectFull) =>
+                item.id === p.id
+                  ? {
+                      ...item,
+                      workflow_status: "Failed",
+                      validation_error:
+                        result.logs.find((l) => l.includes("Error")) || "Validation error",
+                    }
+                  : item,
+              ),
+            };
+          });
+        } else {
+          completedCount += 1;
+          if (result.emailDispatch === "sent") emailsSentCount += 1;
+          if (result.emailDispatch === "duplicate") duplicateEmailsSkippedCount += 1;
+          if (result.emailDispatch === "missing-contact") missingContactCount += 1;
 
-        const articleData = {
-          title: result.articleTitle,
-          metaDescription: `Exclusive guest contribution for ${p.domain}`,
-          outline: [],
-          markdownContent: result.markdownContent,
-        };
-        localStorage.setItem(`linkforge_article_${p.id}`, JSON.stringify(articleData));
-
-        result.logs.forEach((l) => addLog(`  ${l}`, p.domain));
-
-        setActiveCampaign((prev: any) => {
-          if (!prev?.prospects) return prev;
-          return {
-            ...prev,
-            prospects: prev.prospects.map((item: ProspectFull) =>
-              item.id === p.id
-                ? {
-                    ...item,
-                    status:
-                      result.emailDispatch !== "missing-contact"
-                        ? ("Pitched" as ProspectStatus)
-                        : item.status,
-                    contact_email: result.contactEmail,
-                    submission_url: result.submissionUrl ?? item.submission_url,
-                  }
-                : item,
-            ),
+          const articleData = {
+            title: result.articleTitle,
+            metaDescription: `Exclusive guest contribution for ${p.domain}`,
+            outline: [],
+            markdownContent: result.markdownContent,
           };
-        });
+          localStorage.setItem(`linkforge_article_${p.id}`, JSON.stringify(articleData));
 
-        if (selectedId === p.id) {
-          setSubject(result.pitchSubject);
-          setBody(result.pitchBody);
-          setArticle(articleData);
+          result.logs.forEach((l) => addLog(`  ${l}`, p.domain));
+
+          setActiveCampaign((prev: any) => {
+            if (!prev?.prospects) return prev;
+            return {
+              ...prev,
+              prospects: prev.prospects.map((item: ProspectFull) =>
+                item.id === p.id
+                  ? {
+                      ...item,
+                      status:
+                        result.emailDispatch !== "missing-contact"
+                          ? ("Pitched" as ProspectStatus)
+                          : item.status,
+                      contact_email: result.contactEmail,
+                      submission_url: result.submissionUrl ?? item.submission_url,
+                    }
+                  : item,
+              ),
+            };
+          });
+
+          if (selectedId === p.id) {
+            setSubject(result.pitchSubject);
+            setBody(result.pitchBody);
+            setArticle(articleData);
+          }
         }
       } catch (err) {
         failedCount += 1;
@@ -857,14 +883,18 @@ function CampaignDetailPage() {
 
           if (!domain) {
             const values = Object.values(row).map((v) => String(v ?? "").trim());
-            domain = values[0] ?? "";
-            email = values[1] ?? "";
-            score = Number(values[2]) || 0;
+            const domainCandidate = values.find((v) => isPublicDomain(v));
+            if (domainCandidate) {
+              domain = domainCandidate;
+            }
           }
 
-          const cleanDomain = domain
-            .replace(/^https?:\/\//i, "")
-            .replace(/\/+$/, "")
+          const cleanDomain = (
+            domain
+              .replace(/^https?:\/\//i, "")
+              .split(/[/?#]/)[0] ?? ""
+          )
+            .replace(/^www\./i, "")
             .trim();
 
           return {
@@ -873,7 +903,7 @@ function CampaignDetailPage() {
             da_dr_score: score > 0 ? Math.round(score) : 0,
           };
         })
-        .filter((r) => r.domain.length > 0);
+        .filter((r) => r.domain.length > 0 && isPublicDomain(r.domain));
 
       if (parsed.length === 0) {
         toast.error("Could not find valid domains in the file");
@@ -1394,7 +1424,12 @@ function CampaignDetailPage() {
     toast.success(`${label} copied to clipboard!`);
   };
 
-  const pendingCount = prospects.filter((p) => p.status === "Discovered").length;
+  const pendingCount = prospects.filter(
+    (p) => p.status === "Discovered" && !p.validation_error && p.workflow_status !== "Failed",
+  ).length;
+  const errorCount = prospects.filter(
+    (p) => Boolean(p.validation_error) || p.workflow_status === "Failed",
+  ).length;
   const pitchedCount = prospects.filter((p) => p.status === "Pitched").length;
   const repliedCount = prospects.filter((p) => p.status === "Replied").length;
   const liveCount = prospects.filter((p) => p.status === "Live").length;
@@ -1451,6 +1486,16 @@ function CampaignDetailPage() {
         </div>
 
         <div className="flex flex-col gap-2 sm:items-stretch md:flex-row md:items-center">
+          {errorCount > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setErrorsDrawerOpen(true)}
+              className="h-9 w-full gap-1.5 border-red-500/30 bg-red-500/10 text-xs font-semibold text-red-500 hover:bg-red-500/20 hover:text-red-400 md:w-auto"
+            >
+              <span>View Errors ({errorCount})</span>
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"
@@ -2011,7 +2056,15 @@ function CampaignDetailPage() {
 
                       {/* Pipeline Stage — Autonomous Smart Badge (No Manual Dropdown) */}
                       <td className="px-2 py-2.5">
-                        {p.status === "Live" ? (
+                        {p.validation_error || p.workflow_status === "Failed" ? (
+                          <span
+                            title={p.validation_error || "Prospect validation error"}
+                            className="inline-flex items-center gap-1.5 rounded-full bg-red-500/10 border border-red-500/20 px-2 py-1 text-[10px] font-semibold text-red-500"
+                          >
+                            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" />
+                            <span>Invalid</span>
+                          </span>
+                        ) : p.status === "Live" ? (
                           <span
                             title="Live & Backlink Verified"
                             className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 text-[10px] font-semibold text-emerald-500"
@@ -2979,6 +3032,56 @@ function CampaignDetailPage() {
               </section>
             </>
           )}
+        </SheetContent>
+      </Sheet>
+
+      {/* ── VIEW ERRORS DRAWER / SHEET ── */}
+      <Sheet open={errorsDrawerOpen} onOpenChange={setErrorsDrawerOpen}>
+        <SheetContent
+          side="right"
+          className="w-full space-y-6 overflow-y-auto p-4 sm:max-w-xl sm:p-6"
+        >
+          <SheetHeader className="border-b border-border/70 pb-4 text-left">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-red-500/15 text-red-500 font-bold">
+                ✕
+              </div>
+              <div>
+                <SheetTitle className="text-lg font-bold">
+                  Prospect Validation Errors ({errorCount})
+                </SheetTitle>
+                <SheetDescription className="text-xs text-muted-foreground mt-0.5">
+                  The following prospects failed domain validation and were excluded from autonomous outreach.
+                </SheetDescription>
+              </div>
+            </div>
+          </SheetHeader>
+
+          <div className="space-y-3">
+            {prospects
+              .filter((p) => Boolean(p.validation_error) || p.workflow_status === "Failed")
+              .map((p) => (
+                <div
+                  key={p.id}
+                  className="rounded-lg border border-red-500/20 bg-red-500/5 p-3.5 space-y-2 text-xs"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-foreground font-mono">{p.domain}</span>
+                    <span className="rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-semibold text-red-500">
+                      Invalid Domain
+                    </span>
+                  </div>
+                  <div className="rounded bg-background/80 p-2 text-red-400 font-mono text-[11px] border border-red-500/10">
+                    {p.validation_error || "Use a public website domain without a path, credentials, or port."}
+                  </div>
+                  {p.contact_email && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Contact Email: {p.contact_email}
+                    </p>
+                  )}
+                </div>
+              ))}
+          </div>
         </SheetContent>
       </Sheet>
     </div>
