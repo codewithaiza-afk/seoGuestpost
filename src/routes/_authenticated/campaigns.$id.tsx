@@ -1915,14 +1915,15 @@ function CampaignDetailPage() {
               <p className="px-3 py-2 text-[11px] text-muted-foreground md:hidden">
                 Swipe horizontally to view all prospect details.
               </p>
-              <table className="w-full min-w-[880px] table-fixed text-left text-xs">
+              <table className="w-full min-w-[960px] table-fixed text-left text-xs">
                 <colgroup>
-                  <col className="w-[22%]" />
+                  <col className="w-[19%]" />
+                  <col className="w-[17%]" />
+                  <col className="w-[8%]" />
+                  <col className="w-[13%]" />
                   <col className="w-[20%]" />
                   <col className="w-[10%]" />
-                  <col className="w-[20%]" />
                   <col className="w-[13%]" />
-                  <col className="w-[15%]" />
                 </colgroup>
                 <thead className="bg-secondary/60 text-xs text-muted-foreground border-b border-border">
                   <tr>
@@ -1930,6 +1931,7 @@ function CampaignDetailPage() {
                     <th className="px-3 py-2.5 font-semibold">Contact Email</th>
                     <th className="px-2 py-2.5 font-semibold">Domain Authority</th>
                     <th className="px-2 py-2.5 font-semibold">Pipeline Stage</th>
+                    <th className="px-2 py-2.5 font-semibold">Opportunity & Info</th>
                     <th className="px-2 py-2.5 font-semibold">Live Link Equity</th>
                     <th className="px-2 py-2.5 font-semibold text-right">Actions</th>
                   </tr>
@@ -2050,6 +2052,46 @@ function CampaignDetailPage() {
                             <span>Queued</span>
                           </span>
                         )}
+                      </td>
+
+                      {/* Opportunity & Info — All Information at a Glance */}
+                      <td className="px-2 py-2.5">
+                        <div className="flex flex-col gap-1 min-w-0">
+                          {p.submission_url ? (
+                            <a
+                              href={p.submission_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 text-primary hover:underline font-medium text-[11px] truncate max-w-[180px]"
+                              title={p.submission_url}
+                            >
+                              <FileText className="h-3 w-3 shrink-0" />
+                              <span className="truncate">Write For Us Form</span>
+                              <ExternalLink className="h-2.5 w-2.5 shrink-0 opacity-70" />
+                            </a>
+                          ) : (
+                            <span className="text-muted-foreground/80 flex items-center gap-1 text-[11px]">
+                              <Globe className="h-3 w-3 shrink-0 text-muted-foreground/60" />
+                              <span>Direct Outreach</span>
+                            </span>
+                          )}
+
+                          <div className="flex flex-wrap items-center gap-1">
+                            <span
+                              className="inline-flex items-center rounded bg-secondary/80 border border-border/50 px-1.5 py-0.5 text-[10px] text-muted-foreground font-mono"
+                              title={`Workflow status: ${p.workflow_status}`}
+                            >
+                              {p.workflow_status || "Discovered"}
+                            </span>
+
+                            {getDiscoveryPageViews(p.submission_details).length > 0 && (
+                              <span className="inline-flex items-center rounded bg-primary/10 border border-primary/20 px-1.5 py-0.5 text-[9px] text-primary font-semibold">
+                                {getDiscoveryPageViews(p.submission_details)[0]?.eligibility === "free" ? "Free Post" : "Editorial"}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </td>
 
                       {/* Live Link */}
