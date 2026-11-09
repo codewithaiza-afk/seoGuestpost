@@ -1,4 +1,16 @@
-export function renderErrorPage(): string {
+export function renderErrorPage(errorMessage?: string): string {
+  const safeMessage = errorMessage
+    ? errorMessage
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+    : "";
+
+  const errorBlock = safeMessage
+    ? `<div style="text-align: left; background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; padding: 0.75rem; border-radius: 0.375rem; font-size: 0.8125rem; font-family: monospace; word-break: break-all; margin-bottom: 1.5rem;">${safeMessage}</div>`
+    : "";
+
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -20,6 +32,7 @@ export function renderErrorPage(): string {
     <div class="card">
       <h1>This page didn't load</h1>
       <p>Something went wrong on our end. You can try refreshing or head back home.</p>
+      ${errorBlock}
       <div class="actions">
         <button class="primary" onclick="location.reload()">Try again</button>
         <a class="secondary" href="/">Go home</a>

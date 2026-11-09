@@ -5,5 +5,10 @@
       "path": "/api/public/jobs/gmail-replies",
       "schedule": "0 9 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "**": {
+      "includeFiles": "drizzle/**"
+    }
+  }
 }
